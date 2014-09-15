@@ -4,13 +4,13 @@
 import cpu_types_pkg::*;
 
 module register_file (
-  input clk, nRST,
+  input CLK, nRST,
   register_file_if.rf rfif
 );
 
 word_t rf[31:0];
 
-always_ff @(posedge clk, negedge nRST)
+always_ff @(posedge CLK, negedge nRST)
 begin
   if (!nRST)
     rf[31:0] <= '{default:0};
