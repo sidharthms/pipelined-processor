@@ -52,7 +52,7 @@ mult_loop:
   beq   $3, $0, end
   and   $5, $2, $1
   beq   $5, $0, shifts
-  add   $4, $4, $3
+  addu  $4, $4, $3
 
 shifts:
   sll   $3, $3, 1

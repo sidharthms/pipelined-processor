@@ -41,8 +41,12 @@ module datapath (
   // PC
   word_t pc, npc, npc_default;
   logic pause_pc;
+  logic warming_up;
 
-  logic phase, last_phase, next_phase_condition;
+  // Instr Register
+  word_t instruction;
+
+  logic [2:0] phase, last_phase, next_phase_condition;
 
   // Control Singals
   write_t  write_dest;
@@ -52,7 +56,8 @@ module datapath (
 
   // Instruction Fields
   opcode_t opcode;
-  logic [4:0] rs, rt, rd, shamt, funct;
+  logic [4:0] rs, rt, rd, shamt;
+  funct_t funct;
   logic [15:0] immediate;
   logic [25:0] address;
 
@@ -71,7 +76,7 @@ module datapath (
   word_t rdat1, rdat2;
 
   // Interface signals
-  logic imemREN, dmemREN, dmemWEN, halt;
+  logic dmemREN, dmemWEN, halt;
   word_t imemload, dmemload, dmemstore;
 
   // Register File
@@ -92,28 +97,34 @@ module datapath (
     .rfif);
 
   always_comb begin
-    opcode    = opcode_t'(imemload[31:26]);
-    rs        = imemload[25:21];
-    rt        = imemload[20:16];
-    rd        = imemload[15:11];
-    shamt     = imemload[10:6];
-    funct     = imemload[5:0];
-    immediate = imemload[15:0];
-    address   = imemload[25:0];
+    opcode    = opcode_t'(instruction[31:26]);
+    rs        = instruction[25:21];
+    rt        = instruction[20:16];
+    rd        = instruction[15:11];
+    shamt     = instruction[10:6];
+    funct     = funct_t'(instruction[5:0]);
+    immediate = instruction[15:0];
+    address   = instruction[25:0];
   end
 
   always_ff @(posedge CLK, negedge nRST) begin
-    if (!nRST)
+    if (!nRST) begin
       pc <= PC_INIT;
-    else if (!pause_pc)
+      instruction <= 'd0;
+      warming_up <= 1;
+    end
+    else if (!pause_pc) begin
       pc <= npc;
+      instruction <= dpif.imemload;
+      warming_up <= 0;
+    end
   end
 
   always_ff @(posedge CLK, negedge nRST) begin
     if (!nRST)
-      phase <= 1;
+      phase <= 0;
     else if (last_phase)
-      phase <= 1;
+      phase <= 0;
     else if (next_phase_condition)
       phase <= phase + 1;
   end
@@ -121,16 +132,27 @@ module datapath (
   always_comb
   begin
     npc_default = pc + 4;
-    npc = npc_default;
+    npc = warming_up ? 'b0 : npc_default;
 
     last_phase = 1;
     next_phase_condition = 0;
+
+    // Defaults to prevent inferred latches.
+    dmemstore     = 0;
+    custom_rsel1  = 0;
+    custom_rsel2  = 0;
+    custom_wsel   = 0;
+    custom_wdat   = 0;
+    custom_aluin1 = 0;
+    custom_aluin2 = 0;
+    alu_aluop     = ALU_SLL;
 
     if (opcode == RTYPE)
       write_dest = WRITE_RD;
     else
       write_dest = WRITE_RT;
     aluin1 = ALUIN1_RS;
+    aluin2 = ALUIN2_RT;
     dmemREN = 0;
     dmemWEN = 0;
     halt = 0;
@@ -141,8 +163,10 @@ module datapath (
         alu_aluop = funct_aluop;
         case (funct)
           JR :  begin
+            aluin2 = ALUIN2_CUSTOM;
+            custom_rsel2 = 31;
             write_dest = WRITE_NONE;
-            npc = rfif.rdat1;
+            npc = rfif.rdat2;
           end
           SLL,
           SRL : begin
@@ -162,7 +186,8 @@ module datapath (
       BEQ, BNE : begin
         aluin1 = ALUIN1_CUSTOM;
         custom_aluin1 = npc_default;
-        aluin2 = ALUIN2_SIMM;
+        aluin2 = ALUIN2_CUSTOM;
+        custom_aluin2 = $signed({ immediate, 2'b0 });
         alu_aluop = ALU_ADD;
         write_dest = WRITE_NONE;
         custom_rsel1 = rs;
@@ -231,15 +256,18 @@ module datapath (
       end
       J : begin
         write_dest = WRITE_NONE;
-        npc = address;
+        npc = { npc_default[31:28], address, 2'b0 };
       end
       JAL : begin
         write_dest = WRITE_CUSTOM;
-        custom_wsel = rt;
+        custom_wsel = 31;
         custom_wdat = npc_default;
-        npc = address;
+        npc = { npc_default[31:28], address, 2'b0 };
       end
-      HALT : halt = 1;
+      HALT : begin
+        write_dest = WRITE_NONE;
+        halt = 1;
+      end
     endcase
 
     case (funct)
@@ -247,7 +275,7 @@ module datapath (
       SRL  : funct_aluop = ALU_SRL;
       ADDU : funct_aluop = ALU_ADD;
       SUBU : funct_aluop = ALU_SUB;
-      default : funct_aluop = aluop_t'({ 2'b10, funct });
+      default : funct_aluop = aluop_t'(funct[3:0]);
     endcase
   end
 
@@ -256,17 +284,20 @@ module datapath (
     rdat2 = rfif.rdat2;
 
     dpif.imemREN = 1;
-    dpif.imemaddr = pc;
+    dpif.imemaddr = npc;
     dpif.dmemaddr = alu_result;
     dpif.dmemREN = dmemREN;
     dpif.dmemWEN = dmemWEN;
     dpif.dmemstore = dmemstore;
     dpif.dmemstore = dmemstore;
     dpif.halt = halt;
-    imemload = dpif.imemload;
     dmemload = dpif.dmemload;
 
-    pause_pc = !dpif.ihit && !halt;
+    rfif.rsel1 = 0;
+    rfif.rsel2 = 0;
+    rfif.wsel = 0;
+
+    pause_pc = !dpif.ihit || halt || !last_phase;
     rfif.WEN = 1;
     rfif.wdat = alu_result;
     case (write_dest)
@@ -298,8 +329,8 @@ module datapath (
         rfif.rsel2 = rt;
         alu_port_b = rfif.rdat2;
       end
-      ALUIN2_SIMM   : alu_port_b = immediate;
-      ALUIN2_ZIMM   : alu_port_b = $signed(immediate);
+      ALUIN2_SIMM   : alu_port_b = $signed(immediate);
+      ALUIN2_ZIMM   : alu_port_b = immediate;
       ALUIN2_CUSTOM : alu_port_b = custom_aluin2;
     endcase
   end

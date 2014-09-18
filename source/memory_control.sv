@@ -40,10 +40,10 @@ module memory_control (
     ccif.ramWEN = ccif.dWEN[CPUID];
     ccif.ramstore = ccif.dstore[CPUID];
 
-    ccif.iwait[CPUID] = ccif.iaddr[CPUID] == ccif.ramaddr &&
-        ccif.ramstate == ACCESS;
-    ccif.dwait[CPUID] = ccif.daddr[CPUID] == ccif.ramaddr &&
-        ccif.ramstate == ACCESS;
+    ccif.iwait[CPUID] = ccif.iaddr[CPUID] != ccif.ramaddr ||
+        ccif.ramstate != ACCESS;
+    ccif.dwait[CPUID] = ccif.daddr[CPUID] != ccif.ramaddr ||
+        ccif.ramstate != ACCESS;
     ccif.iload[CPUID] = ccif.ramload;
     ccif.dload[CPUID] = ccif.ramload;
   end
