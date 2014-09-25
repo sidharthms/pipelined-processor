@@ -10,7 +10,7 @@ module register_file (
 
 word_t rf[31:0];
 
-always_ff @(posedge CLK, negedge nRST)
+always_ff @(negedge CLK, negedge nRST)
 begin
   if (!nRST)
     rf[31:0] <= '{default:0};
