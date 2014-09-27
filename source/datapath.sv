@@ -42,6 +42,7 @@ module datapath (
 
   // PC
   logic pause_pc;
+  logic pause_system;
 
   // ALU signals
   aluop_t alu_aluop;
@@ -83,7 +84,7 @@ module datapath (
   logic [25:0] decode_address;
   word_t instruction, pc, decode_npc_default, fetch_npc, jump_addr;
 
-  always @(posedge CLK, negedge nRST) begin
+  always_ff @(posedge CLK, negedge nRST) begin
     if (!nRST) begin
       pc <= PC_INIT;
       decode_npc_default <= PC_INIT + 4;
@@ -91,14 +92,14 @@ module datapath (
     end
     else if (!pause_pc) begin
       instruction <= dpif.imemload;
-      if (exec_branch)
-        fetch_npc = alu_result;
-      else if (jump_instr)
-        fetch_npc = jump_addr;
-      else
-        fetch_npc = decode_npc_default;
-      pc <= fetch_npc;
-      decode_npc_default <= fetch_npc + 4;
+      //if (exec_branch)
+      //  fetch_npc = alu_result;
+      //else if (jump_instr)
+      //  fetch_npc = jump_addr;
+      //else
+      //  fetch_npc = decode_npc_default;
+      pc <= decode_npc_default;
+      decode_npc_default <= decode_npc_default + 4;
     end
   end
   always_comb begin
@@ -134,7 +135,7 @@ module datapath (
   logic [4:0] comb_rd, comb_rt;
   logic [15:0] comb_immediate;
 
-  always @(posedge CLK, negedge nRST)
+  always_ff @(posedge CLK, negedge nRST)
   begin
     if(!nRST) begin
       exec_halt          <= 0;
@@ -142,7 +143,7 @@ module datapath (
     else begin
       exec_halt          <= comb_halt;
     end
-    if (!pause_pc) begin
+    if (!pause_system) begin
       exec_write_info    <= comb_write_info;
       exec_aluin1        <= comb_aluin1;
       exec_aluin2        <= comb_aluin2;
@@ -319,7 +320,7 @@ module datapath (
   logic [15:0] data_immediate;
   word_t data_alu_result, data_npc_default, data_dmemstore;
 
-  always @ (posedge CLK, negedge nRST)
+  always_ff @ (posedge CLK, negedge nRST)
   begin
     if(!nRST)
     begin
@@ -327,12 +328,12 @@ module datapath (
       data_dmemREN <= 0;
       data_halt    <= 0;
     end
-    else if (!pause_pc) begin
+    else if (!pause_system) begin
       data_dmemWEN <= exec_dmemWEN;
       data_dmemREN <= exec_dmemREN;
       data_halt    <= exec_halt;
     end
-    if (!pause_pc) begin
+    if (!pause_system) begin
       data_write_info   <= exec_write_info;
       data_rd           <= exec_rd;
       data_rt           <= exec_rt;
@@ -394,9 +395,11 @@ module datapath (
     dpif.dmemstore = data_dmemstore;
 
     if (data_dmemREN || data_dmemWEN)
-      pause_pc = (!dpif.dhit && !dpif.ihit) || !op_complete;
+      pause_system = (!dpif.dhit && !dpif.ihit) || !op_complete;
     else
-      pause_pc = !dpif.ihit || exec_halt;
+      pause_system = 0;
+
+    pause_pc = !dpif.ihit || exec_halt || pause_system;
   end
 
   // Write back stage
