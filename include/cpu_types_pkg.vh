@@ -153,5 +153,13 @@ package cpu_types_pkg;
     ERROR
   } ramstate_t;
 
+// register write source
+  typedef enum logic [1:0] {
+    WRITE_ALU,
+    WRITE_RAM,
+    WRITE_NPC,
+    WRITE_NONE
+  } write_t;
+
 endpackage
 `endif //CPU_TYPES_PKG_VH

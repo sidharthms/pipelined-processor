@@ -9,6 +9,7 @@
 
 // types
 `include "cpu_types_pkg.vh"
+`include "exec_mem_if.vh"
 
 interface datapath_cache_if;
   // import types
