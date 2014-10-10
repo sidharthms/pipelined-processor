@@ -175,6 +175,7 @@ module decode (
       BEQ, BNE : begin
         next_alu_aluop = ALU_SUB;
         next_branch_if_zero = rtype_instruction.opcode == BEQ;
+        next_wsel = 0;
         branch_instr = 1;
       end
       LUI : begin

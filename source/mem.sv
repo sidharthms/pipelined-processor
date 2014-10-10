@@ -5,6 +5,7 @@ import cpu_types_pkg::*;
 
 module mem (
   input logic CLK, nRST,
+  input logic en,
   input logic dhit,
   input word_t dmemload,
   output logic data_stall,
@@ -30,7 +31,7 @@ module mem (
       mem_data        <= 0;
     end
     else begin
-      if (!data_stall) begin
+      if (en) begin
         out.alu_result  <= in.alu_result;
         out.wsel        <= in.wsel;
         out.wdat_source <= in.wdat_source;
@@ -50,6 +51,6 @@ module mem (
     dmemREN         <= in.dmemREN && (last_npc != in.instr_npc);
     dmemWEN         <= in.dmemWEN && (last_npc != in.instr_npc);
     dmemstore       <= in.dmemstore;
-    data_stall           <= (in.dmemREN || in.dmemWEN) && (last_npc != in.instr_npc);
+    data_stall      <= (in.dmemREN || in.dmemWEN) && (last_npc != in.instr_npc);
   end
 endmodule

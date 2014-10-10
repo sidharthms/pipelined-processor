@@ -27,36 +27,6 @@ module forward (
     deif.safe_alu_in1 = deif.decode_alu_in1;
     deif.safe_alu_in2 = deif.decode_alu_in2;
     deif.safe_dmemstore = deif.decode_dmemstore;
-    if (emif.wsel != 0) begin
-      if (emif.wdat_source == WRITE_RAM && !data_stall) begin
-        if (mem_rs_match)
-          deif.safe_alu_in1 = dmemload;
-        if (mem_rt_match) begin
-          if (deif.dmemWEN)
-            deif.safe_dmemstore = dmemload;
-          else
-            deif.safe_alu_in2 = dmemload;
-        end
-      end else if (emif.wdat_source == WRITE_ALU) begin
-        if (mem_rs_match)
-          deif.safe_alu_in1 = emif.alu_result;
-        if (mem_rt_match) begin
-          if (deif.dmemWEN)
-            deif.safe_dmemstore = emif.alu_result;
-          else
-            deif.safe_alu_in2 = emif.alu_result;
-        end
-      end else begin
-        if (mem_rs_match)
-          deif.safe_alu_in1 = emif.instr_npc;
-        if (mem_rt_match) begin
-          if (deif.dmemWEN)
-            deif.safe_dmemstore = emif.instr_npc;
-          else
-            deif.safe_alu_in2 = emif.instr_npc;
-        end
-      end
-    end
     if (mwif.wsel != 0) begin
       if (mwif.wdat_source == WRITE_RAM) begin
         if (wb_rs_match)
@@ -84,6 +54,36 @@ module forward (
             deif.safe_dmemstore = mwif.instr_npc;
           else
             deif.safe_alu_in2 = mwif.instr_npc;
+        end
+      end
+    end
+    if (emif.wsel != 0) begin
+      if (emif.wdat_source == WRITE_RAM && !data_stall) begin
+        if (mem_rs_match)
+          deif.safe_alu_in1 = dmemload;
+        if (mem_rt_match) begin
+          if (deif.dmemWEN)
+            deif.safe_dmemstore = dmemload;
+          else
+            deif.safe_alu_in2 = dmemload;
+        end
+      end else if (emif.wdat_source == WRITE_ALU) begin
+        if (mem_rs_match)
+          deif.safe_alu_in1 = emif.alu_result;
+        if (mem_rt_match) begin
+          if (deif.dmemWEN)
+            deif.safe_dmemstore = emif.alu_result;
+          else
+            deif.safe_alu_in2 = emif.alu_result;
+        end
+      end else begin
+        if (mem_rs_match)
+          deif.safe_alu_in1 = emif.instr_npc;
+        if (mem_rt_match) begin
+          if (deif.dmemWEN)
+            deif.safe_dmemstore = emif.instr_npc;
+          else
+            deif.safe_alu_in2 = emif.instr_npc;
         end
       end
     end

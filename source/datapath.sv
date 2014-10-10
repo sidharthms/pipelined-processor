@@ -31,12 +31,13 @@ module datapath (
   logic fetch_en, fetch_zero;
   logic decode_en, decode_zero;
   logic exec_en, exec_zero;
+  logic mem_en;
 
   logic jump_instr, branch_instr, misc_npc_en;
   word_t branch_target, misc_npc;
   logic alu_zero;
 
-  logic data_stall, cancel_fetch;
+  logic data_stall, cancel_fetch, squash;
 
   word_t mem_data;
   word_t pc;
@@ -55,7 +56,7 @@ module datapath (
                     .branch_target, .in(fdif), .out(deif));
   exec            exec_module(.CLK, .nRST, .en(exec_en), .zero(exec_zero),
                     .alu_zero, .in(deif), .out(emif));
-  mem             mem_module(.CLK, .nRST, .dhit(dpif.dhit),
+  mem             mem_module(.CLK, .nRST, .en(mem_en), .dhit(dpif.dhit),
                     .dmemload(dpif.dmemload), .data_stall, .mem_data,
                     .dmemREN(dpif.dmemREN), .dmemWEN(dpif.dmemWEN),
                     .dmemaddr(dpif.dmemaddr), .dmemstore(dpif.dmemstore),
@@ -65,18 +66,19 @@ module datapath (
 
   branch          branch_module(.CLK, .nRST, .jump_instr, .branch_instr,
                     .alu_zero(alu_zero), .pc, .branch_target, .misc_npc_en,
-                    .misc_npc, .cancel_fetch, .emif, .deif, .fdif);
+                    .misc_npc, .cancel_fetch, .squash, .emif, .deif, .fdif);
 
   forward         forward_module(.CLK, .nRST, .data_stall,
                     .dmemload(mem_data), .mwif, .emif, .deif, .fdif);
 
   always_comb begin
-    exec_en = !data_stall;
-    fetch_en = exec_en;
-    decode_en = exec_en;
+    mem_en    = !data_stall && !dpif.halt;
+    exec_en   = mem_en;
+    fetch_en  = exec_en;
+    decode_en = fetch_en;
 
     exec_zero = 0;
     fetch_zero = cancel_fetch;
-    decode_zero = 0;
+    decode_zero = squash;
   end
 endmodule

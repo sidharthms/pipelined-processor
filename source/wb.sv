@@ -11,14 +11,9 @@ module wb (
   mem_wb_if.wb in
 );
 
-  always @ (posedge CLK, negedge nRST) begin
-    if (!nRST)
-      halt <= 0;
-    else
-      halt <= in.halt;
-  end
   always_comb begin
-    WEN = 1;
+    halt = in.halt;
+    WEN  = 1;
     wsel = in.wsel;
     wdat = 0;
     case (in.wdat_source)
