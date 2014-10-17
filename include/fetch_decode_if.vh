@@ -8,14 +8,15 @@ interface fetch_decode_if;
 
   word_t instruction, instr_npc;
   word_t branch_target;
+  logic branch_taken;
 
   modport fetch (
-    output  instruction, instr_npc,
+    output  instruction, instr_npc, branch_taken,
     input   branch_target
   );
 
   modport decode (
-    input   instruction, instr_npc,
+    input   instruction, instr_npc, branch_taken,
     output  branch_target
   );
 endinterface

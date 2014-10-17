@@ -11,7 +11,8 @@ module fetch (
   input logic ihit,
   input logic halt,
   input word_t imemload,
-  output word_t pc,
+  input branch_taken,
+  output word_t npc_default,
   output logic imemREN,
   output word_t imemaddr,
   fetch_decode_if.fetch out
@@ -19,20 +20,24 @@ module fetch (
   // pc init
   parameter PC_INIT = 0;
 
-  word_t npc, npc_default;
+  word_t pc, npc;
   logic pause;
   always_ff @ (posedge CLK, negedge nRST) begin
     if (!nRST) begin
       pc                <= PC_INIT;
       out.instr_npc     <= 'd0;
       out.instruction   <= 'd0;
+      out.branch_taken  <= 0;
     end else if (!pause) begin
       pc                <= npc;
       out.instr_npc     <= npc_default;
-      if (ihit && !zero)
+      if (ihit && !zero) begin
         out.instruction <= imemload;
-      else
+        out.branch_taken  <= branch_taken;
+      end else begin
         out.instruction <= 'd0;
+        out.branch_taken  <= 0;
+      end
     end
   end
 

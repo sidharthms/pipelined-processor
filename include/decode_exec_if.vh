@@ -17,6 +17,7 @@ interface decode_exec_if;
   logic         branch_instr;
   logic         branch_if_zero;
   word_t        branch_target;
+  logic         branch_taken;
 
   logic         halt;
   word_t        instr_npc;
@@ -29,7 +30,7 @@ interface decode_exec_if;
     output  decode_alu_in1, decode_alu_in2, alu_aluop,
             rs_alu_in, rt_alu_in,
             wsel, wdat_source,
-            branch_instr, branch_if_zero, branch_target,
+            branch_instr, branch_if_zero, branch_target, branch_taken,
             halt, instr_npc,
             dmemREN, dmemWEN, decode_dmemstore
   );
@@ -38,7 +39,7 @@ interface decode_exec_if;
     input   safe_alu_in1, safe_alu_in2, alu_aluop,
             rs_alu_in, rt_alu_in,
             wsel, wdat_source,
-            branch_instr, branch_if_zero, branch_target,
+            branch_instr, branch_if_zero, branch_target, branch_taken,
             halt, instr_npc,
             dmemREN, dmemWEN, safe_dmemstore
   );

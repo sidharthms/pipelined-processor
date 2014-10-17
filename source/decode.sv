@@ -75,6 +75,7 @@ module decode (
       out.dmemREN           <= 0;
       out.dmemWEN           <= 0;
       out.decode_dmemstore  <= 0;
+      out.branch_taken      <= 0;
     end else if (en && zero) begin
       out.halt              <= 0;
       out.decode_alu_in1    <= 0;
@@ -89,6 +90,7 @@ module decode (
       out.branch_instr      <= 0;
       out.branch_if_zero    <= 0;
       out.branch_target     <= 0;
+      out.branch_taken      <= 0;
 
       out.instr_npc         <= 0;
 
@@ -109,6 +111,7 @@ module decode (
       out.branch_instr      <= branch_instr;
       out.branch_if_zero    <= next_branch_if_zero;
       out.branch_target     <= branch_target;
+      out.branch_taken      <= in.branch_taken;
 
       out.instr_npc         <= next_instr_npc;
 
