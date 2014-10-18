@@ -12,6 +12,7 @@ module fetch (
   input logic halt,
   input word_t imemload,
   input branch_taken,
+  output logic npc_valid,
   output word_t npc_default,
   output logic imemREN,
   output word_t imemaddr,
@@ -22,20 +23,26 @@ module fetch (
 
   word_t pc, npc;
   logic pause;
+
+  assign npc_valid = !pause && ihit && !zero;
+
   always_ff @ (posedge CLK, negedge nRST) begin
     if (!nRST) begin
-      pc                <= PC_INIT;
-      out.instr_npc     <= 'd0;
-      out.instruction   <= 'd0;
-      out.branch_taken  <= 0;
+      pc                  <= PC_INIT;
+      out.instr_npc       <= 'd0;
+      out.instruction     <= 'd0;
+      out.branch_taken    <= 0;
     end else if (!pause) begin
-      pc                <= npc;
-      out.instr_npc     <= npc_default;
+      if (ihit || misc_npc_en) begin
+        pc                <= npc;
+      end
       if (ihit && !zero) begin
-        out.instruction <= imemload;
+        out.instruction   <= imemload;
+        out.instr_npc     <= npc_default;
         out.branch_taken  <= branch_taken;
       end else begin
-        out.instruction <= 'd0;
+        out.instruction   <= 'd0;
+        out.instr_npc     <= 0;
         out.branch_taken  <= 0;
       end
     end
@@ -45,7 +52,7 @@ module fetch (
     imemREN = 1;
     imemaddr = pc;
     npc_default = pc + 4;
-    pause = !en || !ihit || halt;
+    pause = !en || halt;
     if (misc_npc_en)
       npc = misc_npc;
     else

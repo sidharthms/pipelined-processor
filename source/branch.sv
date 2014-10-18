@@ -16,6 +16,7 @@ module branch (
   input logic jump_instr,
   input word_t branch_target,
   input logic alu_zero,
+  input logic npc_valid,
   input word_t npc_default,
   output logic misc_npc_en,
   output word_t misc_npc,
@@ -68,7 +69,8 @@ module branch (
     squash = 0;
     branch_taken = 0;
 
-    if (entry.valid && entry.instr_npc == npc_default && entry.taken[1])
+    if (npc_valid & entry.valid && entry.instr_npc == npc_default
+        && entry.taken[1])
     begin
       misc_npc_en = 1;
       cancel_fetch = 0;

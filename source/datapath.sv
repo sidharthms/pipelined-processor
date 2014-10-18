@@ -38,19 +38,19 @@ module datapath (
   logic alu_zero;
 
   logic data_stall, cancel_fetch, squash;
+  word_t npc_default;
+  logic branch_taken, npc_valid;
 
   word_t mem_data;
-  word_t npc_default;
-  logic branch_taken;
 
   // Register File
 
   register_file register_file_module(.CLK, .nRST, .rfif);
   fetch           fetch_module(.CLK, .nRST, .en(fetch_en), .zero(fetch_zero),
                     .misc_npc_en, .misc_npc, .ihit(dpif.ihit),
-                    .halt(dpif.halt), .imemload(dpif.imemload), .npc_default,
-                    .imemREN(dpif.imemREN), .imemaddr(dpif.imemaddr),
-                    .out(fdif), .branch_taken);
+                    .halt(dpif.halt), .imemload(dpif.imemload), .npc_valid,
+                    .npc_default, .imemREN(dpif.imemREN),
+                    .imemaddr(dpif.imemaddr), .out(fdif), .branch_taken);
   decode          decode_module(.CLK, .nRST,.en(decode_en), .zero(decode_zero),
                     .rdat1(rfif.rdat1), .rdat2(rfif.rdat2), .rsel1(rfif.rsel1),
                     .rsel2(rfif.rsel2), .jump_instr, .branch_instr,
@@ -66,8 +66,9 @@ module datapath (
                     .wsel(rfif.wsel), .wdat(rfif.wdat), .in(mwif));
 
   branch          branch_module(.CLK, .nRST, .jump_instr, .branch_taken,
-                    .alu_zero(alu_zero), .npc_default, .branch_target, .misc_npc_en,
-                    .misc_npc, .cancel_fetch, .squash, .emif, .deif, .fdif);
+                    .alu_zero(alu_zero), .npc_valid, .npc_default,
+                    .branch_target, .misc_npc_en, .misc_npc, .cancel_fetch,
+                    .squash, .emif, .deif, .fdif);
 
   forward         forward_module(.CLK, .nRST, .data_stall,
                     .dmemload(mem_data), .mwif, .emif, .deif, .fdif);
