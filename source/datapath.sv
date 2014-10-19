@@ -38,7 +38,7 @@ module datapath (
   logic alu_zero;
 
   logic data_shadow, data_stall, cancel_fetch, squash;
-  word_t alu_result, pc_default;
+  word_t alu_result, npc_default;
   logic branch_taken, npc_valid;
 
   word_t mem_data;
