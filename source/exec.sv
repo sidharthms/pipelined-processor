@@ -1,22 +1,22 @@
 `include "decode_exec_if.vh"
 `include "exec_mem_if.vh"
 
+import cpu_types_pkg::*;
+
 module exec (
   input logic CLK, nRST,
   input logic en, zero,
   output logic alu_zero,
+  output word_t alu_result,
   decode_exec_if.exec in,
   exec_mem_if.exec out
 );
-  import cpu_types_pkg::*;
-
   // ALU signals
   aluop_t alu_aluop;
   word_t  alu_port_a;
   word_t  alu_port_b;
   logic   alu_negative;
   logic   alu_overflow;
-  word_t  alu_result;
 
   alu alu_module(
     .aluop(alu_aluop),

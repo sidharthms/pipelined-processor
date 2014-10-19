@@ -10,6 +10,8 @@ module forward (
   input logic CLK, nRST,
   input logic data_stall,
   input word_t dmemload,
+  input word_t alu_result,
+  output logic data_shadow,
   mem_wb_if.wb mwif,
   exec_mem_if.mem emif,
   decode_exec_if deif,
@@ -19,6 +21,8 @@ module forward (
   logic wb_rs_match, wb_rt_match;
 
   always_comb begin
+    data_shadow = 0;
+
     mem_rs_match = emif.wsel == deif.rs_alu_in;
     mem_rt_match = emif.wsel == deif.rt_alu_in;
     wb_rs_match  = mwif.wsel == deif.rs_alu_in;
@@ -58,10 +62,13 @@ module forward (
       end
     end
     if (emif.wsel != 0) begin
-      if (emif.wdat_source == WRITE_RAM && !data_stall) begin
-        if (mem_rs_match)
+      if (emif.wdat_source == WRITE_RAM) begin
+        if (mem_rs_match) begin
+          data_shadow = 1;
           deif.safe_alu_in1 = dmemload;
+        end
         if (mem_rt_match) begin
+          data_shadow = 1;
           if (deif.dmemWEN)
             deif.safe_dmemstore = dmemload;
           else
@@ -87,5 +94,8 @@ module forward (
         end
       end
     end
+    if ((emif.dmemWEN && (deif.dmemWEN || deif.dmemREN) ||
+        emif.dmemREN && deif.dmemWEN) && emif.alu_result == alu_result)
+      data_shadow = 1;
   end
 endmodule

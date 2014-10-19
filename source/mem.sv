@@ -8,6 +8,7 @@ module mem (
   input logic en,
   input logic dhit,
   input word_t dmemload,
+  input logic data_shadow,
   output logic data_stall,
   output word_t mem_data,
   output logic dmemREN, dmemWEN,
@@ -15,8 +16,7 @@ module mem (
   exec_mem_if.mem in,
   mem_wb_if.mem out
 );
-
-  word_t last_npc;
+  logic shadow_stage;
 
   always_ff @ (posedge CLK, negedge nRST)
   begin
@@ -27,8 +27,8 @@ module mem (
       out.halt        <= 0;
       out.instr_npc   <= 0;
       out.dmemload    <= 0;
-      last_npc        <= 0;
       mem_data        <= 0;
+      shadow_stage    <= 0;
     end
     else begin
       if (en) begin
@@ -37,20 +37,23 @@ module mem (
         out.wdat_source <= in.wdat_source;
         out.halt        <= in.halt;
         out.instr_npc   <= in.instr_npc;
-        out.dmemload    <= mem_data;
+        out.dmemload    <= shadow_stage ? mem_data : dmemload;
       end
       if (dhit)
-        mem_data  <= dmemload;
-      if (dhit || (!in.dmemREN && !in.dmemWEN))
-        last_npc <= in.instr_npc;
+        mem_data        <= dmemload;
+      if (data_shadow && dhit && !shadow_stage)
+        shadow_stage  <= 1;
+      else
+        shadow_stage  <= 0;
     end
   end
 
   always_comb begin
-    dmemaddr        <= in.alu_result;
-    dmemREN         <= in.dmemREN && (last_npc != in.instr_npc);
-    dmemWEN         <= in.dmemWEN && (last_npc != in.instr_npc);
-    dmemstore       <= in.dmemstore;
-    data_stall      <= (in.dmemREN || in.dmemWEN) && (last_npc != in.instr_npc);
+    dmemaddr        = in.alu_result;
+    dmemREN         = in.dmemREN && !shadow_stage;
+    dmemWEN         = in.dmemWEN && !shadow_stage;
+    dmemstore       = in.dmemstore;
+    data_stall      = ((in.dmemREN || in.dmemWEN) && !dhit || data_shadow) && !shadow_stage;
+
   end
 endmodule
