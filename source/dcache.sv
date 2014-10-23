@@ -20,8 +20,8 @@ typedef struct {
 
 module dcache (
   input logic CLK, nRST,
-  datapath_cache_if.cache dcif,
-  cache_control_if.caches ccif
+  datapath_cache_if.dcache dcif,
+  cache_control_if.dcache ccif
 );
  parameter CPUID = 0;
 

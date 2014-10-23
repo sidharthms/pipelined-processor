@@ -18,8 +18,8 @@
 
 module caches (
   input logic CLK, nRST,
-  datapath_cache_if.cache dcif,
-  cache_control_if.caches ccif
+  datapath_cache_if dcif,
+  cache_control_if ccif
 );
   // import types
   import cpu_types_pkg::word_t;
@@ -30,12 +30,12 @@ module caches (
 
   // dcache
 `ifdef USE_DCACHE
-  dcache  DCACHE(.CLK, .nRST, .dcif, .ccif);
+  dcache  DCACHE(CLK, nRST, dcif, ccif);
 `endif
 
 `ifdef USE_ICACHE
   // icache
-  icache  ICACHE(.CLK, .nRST, .dcif, .ccif);
+  icache  ICACHE(CLK, nRST, dcif, ccif);
 `endif
 
 `ifndef USE_ICACHE

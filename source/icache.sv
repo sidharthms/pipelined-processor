@@ -14,8 +14,8 @@ typedef struct {
 
 module icache (
   input logic CLK, nRST,
-  datapath_cache_if.cache dcif,
-  cache_control_if.caches ccif
+  datapath_cache_if.icache dcif,
+  cache_control_if.icache ccif
 );
  parameter CPUID = 0;
 
@@ -25,8 +25,6 @@ module icache (
   logic hit;
   word_t idata;
   word_t instr;
-
-  enum bit {IDLE, RAMREAD} state;
 
   assign entry = instr_cache[dcif.imemaddr[5:2]];
   assign hit = entry.valid && (entry.tag == dcif.imemaddr[31:6]);
@@ -52,19 +50,16 @@ module icache (
 
   always_ff @ (posedge CLK, negedge nRST) begin
     if(!nRST) begin
-      state <= IDLE;
       instr <= 0;
       for (int i = 0; i < 16; i +=1)
         instr_cache[i].valid <= 0;
     end else begin
       instr <= dcif.imemload;
       if(dcif.imemREN && !ccif.iwait[CPUID]) begin //ram hit
-        state <= IDLE;
         instr_cache[dcif.imemaddr[5:2]].block <= ccif.iload[CPUID];
         instr_cache[dcif.imemaddr[5:2]].tag   <= dcif.imemaddr[31:6];
         instr_cache[dcif.imemaddr[5:2]].valid <= 1;
-      end else if(dcif.imemREN && !hit)
-        state <= RAMREAD;
+      end
     end
   end
 endmodule
