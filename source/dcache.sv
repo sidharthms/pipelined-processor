@@ -38,6 +38,7 @@ module dcache (
   logic dREN, dWEN;
   word_t daddr, dstore;
 
+  logic flushed;
   logic [2:0] flush_index;
   logic [1:0] flush_col;
   logic flush_WEN;
@@ -124,8 +125,8 @@ module dcache (
               nextstate = RAMLOAD;
           end else begin
             dWEN = 1;
-            daddr = {block.tag, index, 3'b000};
-            dstore = block.word[0];
+            daddr = {entry.way[entry.lru].tag, index, 3'b000};
+            dstore = entry.way[entry.lru].word[0];
             if (!ccif.dwait[CPUID])
               nextstate = RAMWR;
           end
@@ -139,8 +140,8 @@ module dcache (
       end
       RAMWR: begin
         dWEN = 1;
-        daddr = {block.tag, index, 3'b100};
-        dstore = block.word[1];
+        daddr = {entry.way[entry.lru].tag, index, 3'b100};
+        dstore = entry.way[entry.lru].word[1];
         if (!ccif.dwait[CPUID])
           nextstate = IDLE;
       end
@@ -151,18 +152,23 @@ module dcache (
     if(!nRST) begin
       flush_index <= 0;
       flush_col   <= 0;
+      flushed     <= 0;
     end else if (dcif.halt && !dcif.flushed) begin
       if (!ccif.dwait[CPUID] || !flush_WEN) begin
         if (flush_col == 3) begin
-          flush_index <= flush_index + 1;
-          flush_col   <= 0;
+          if (flush_index == 7)
+            flushed   <= 1;
+          else begin
+            flush_index <= flush_index + 1;
+            flush_col   <= 0;
+          end
         end else begin
           flush_col   <= flush_col + 1;
         end
       end
     end
   end
-  assign flush_WEN   = data_cache[flush_index].way[flush_col[1]].dirty;
+  assign flush_WEN   = !flushed & data_cache[flush_index].way[flush_col[1]].dirty;
   assign flush_addr  = {data_cache[flush_index].way[flush_col[1]].tag,
                         flush_index, flush_col[0], 2'b0};
   assign flush_store =
@@ -173,5 +179,5 @@ module dcache (
   assign ccif.daddr    = dcif.halt ? flush_addr : daddr;
   assign ccif.dstore  = dcif.halt ? flush_store : dstore;
 
-  assign dcif.flushed = flush_index == 7 && flush_col == 3;
+  assign dcif.flushed = flushed;
 endmodule
