@@ -13,6 +13,8 @@
 // cpu types
 `include "cpu_types_pkg.vh"
 
+`define USE_ICACHE
+
 module caches (
   input logic CLK, nRST,
   datapath_cache_if.cache dcif,
@@ -25,38 +27,35 @@ module caches (
 
   word_t instr;
 
+  // dcache
+`ifdef USE_DCACHE
+  dcache  DCACHE(.CLK, .nRST, .dcif, .ccif);
+`endif
+
+`ifdef USE_ICACHE
   // icache
   icache  ICACHE(.CLK, .nRST, .dcif, .ccif);
-  // dcache
-  //dcache  DCACHE(.CLK, .nRST, .dcif, .ccif);
+`endif
 
+`ifndef USE_ICACHE
   // single cycle instr saver (for memory ops)
-//  always_ff @(posedge CLK)
-//  begin
-//    if (!nRST)
-//    begin
-//      instr <= '0;
-//    end
-//    else
-//    if (!ccif.iwait[CPUID])
-//    begin
-//      instr <= ccif.iload[CPUID];
-//    end
-//  end
-  // dcache invalidate before halt
-  assign dcif.flushed = dcif.halt;
+  always_ff @(posedge CLK)
+  begin
+    if (!nRST)
+    begin
+      instr <= '0;
+    end
+    else
+    if (!ccif.iwait[CPUID])
+    begin
+      instr <= ccif.iload[CPUID];
+    end
+  end
 
-  //single cycle
-//  assign dcif.ihit = (dcif.imemREN) ? ~ccif.iwait[CPUID] : 0;
-  assign dcif.dhit = (dcif.dmemREN|dcif.dmemWEN) ? ~ccif.dwait[CPUID] : 0;
-//  assign dcif.imemload = (ccif.iwait[CPUID]) ? instr : ccif.iload[CPUID];
-  assign dcif.dmemload = ccif.dload[CPUID];
+  assign dcif.ihit = (dcif.imemREN) ? ~ccif.iwait[CPUID] : 0;
+  assign dcif.imemload = (ccif.iwait[CPUID]) ? instr : ccif.iload[CPUID];
+  assign ccif.iaddr[CPUID] = dcif.imemaddr;
+  assign ccif.iREN[CPUID] = dcif.imemREN;
+`endif
 
-
-//  assign ccif.iREN[CPUID] = dcif.imemREN;
-  assign ccif.dREN[CPUID] = dcif.dmemREN;
-  assign ccif.dWEN[CPUID] = dcif.dmemWEN;
-  assign ccif.dstore[CPUID] = dcif.dmemstore;
-//  assign ccif.iaddr[CPUID] = dcif.imemaddr;
-  assign ccif.daddr[CPUID] = dcif.dmemaddr;
 endmodule

@@ -37,15 +37,18 @@ module icache (
 
   //hit to datapath
   assign dcif.ihit = dcif.imemREN && (hit || !ccif.iwait[CPUID]);
+  assign dcif.imemload = hit ? entry.block :
+      (ccif.iwait[CPUID] ? instr : ccif.iload[CPUID]);
 
-  always_comb begin
-    if (hit)
-      dcif.imemload = entry.block;
-    else if (ccif.iwait[CPUID])
-      dcif.imemload = instr;
-    else
-      dcif.imemload = ccif.iload[CPUID];
-  end
+//  always_comb begin
+//    if (hit) begin
+//      dcif.imemload = entry.block;
+//    end else if (ccif.iwait[CPUID]) begin
+//      dcif.imemload = instr;
+//    end else begin
+//      dcif.imemload = ccif.iload[CPUID];
+//    end
+//  end
 
   always_ff @ (posedge CLK, negedge nRST) begin
     if(!nRST) begin
@@ -64,4 +67,17 @@ module icache (
         state <= RAMREAD;
     end
   end
+
+`ifndef USE_DCACHE
+  // dcache invalidate before halt
+  assign dcif.flushed = dcif.halt;
+
+  assign ccif.dREN[CPUID] = dcif.dmemREN;
+  assign ccif.dWEN[CPUID] = dcif.dmemWEN;
+  assign ccif.dstore[CPUID] = dcif.dmemstore;
+  assign ccif.daddr[CPUID] = dcif.dmemaddr;
+
+  assign dcif.dhit = (dcif.dmemREN|dcif.dmemWEN) ? ~ccif.dwait[CPUID] : 0;
+  assign dcif.dmemload = ccif.dload[CPUID];
+`endif
 endmodule
