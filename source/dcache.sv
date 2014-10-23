@@ -33,19 +33,36 @@ module dcache (
   logic hit, dirty;
   word_t ddata;
   logic [21:0] requestTag;
+  logic [2:0]  index;
+
+  logic dREN, dWEN;
+  word_t daddr, dstore;
+
+  logic [2:0] flush_index;
+  logic [1:0] flush_col;
+  logic flush_WEN;
+  word_t flush_addr, flush_store;
+
 
   enum logic [2:0] {IDLE, RAMLOAD, RAMWR} state, nextstate;
 
   assign requestTag = dcif.dmemaddr[31:6];
+  assign index      = dcif.dmemaddr[5:3];
 
-  assign wayhit[0] = entry.way[0].valid && (entry.way[0].tag == requestTag);
-  assign wayhit[1] = entry.way[1].valid && (entry.way[1].tag == requestTag);
-  assign hit       = wayhit[0] || wayhit[1];
+  assign wayhit[0]  = entry.way[0].valid && (entry.way[0].tag == requestTag);
+  assign wayhit[1]  = entry.way[1].valid && (entry.way[1].tag == requestTag);
+  assign hit        = wayhit[0] || wayhit[1];
 
-  assign entry      = data_cache[dcif.dmemaddr[5:3]];
-  assign block  = wayhit[0] == 1 ? entry.way[0] : entry.way[1];
+  assign entry      = data_cache[index];
+  assign block      = wayhit[0] == 1 ? entry.way[0] : entry.way[1];
   assign ddata      = block.word[dcif.dmemaddr[2]];
-  assign dirty = entry.way[entry.lru].dirty;
+  assign dirty      = entry.way[entry.lru].dirty;
+
+  assign dcif.dhit = (hit && (dcif.dmemREN || dcif.dmemWEN) && state == IDLE) ||
+                     (state == RAMLOAD && nextstate == IDLE);
+
+  assign dcif.dmemload = (state == RAMLOAD && nextstate == IDLE &&
+                          dcif.dmemaddr[2] == 1) ? ccif.dload[CPUID] : ddata;
 
   always_ff @ (posedge CLK, negedge nRST) begin
     if(!nRST) begin
@@ -61,71 +78,100 @@ module dcache (
       state <= nextstate;
 
       if (state == IDLE && nextstate == RAMLOAD) begin
-        data_cache[dcif.dmemaddr[5:3]].way[entry.lru].word[0]          <= ccif.dload[CPUID];
-        data_cache[dcif.dmemaddr[5:3]].way[entry.lru].valid   <= 1;
-        data_cache[dcif.dmemaddr[5:3]].way[entry.lru].tag     <= requestTag;
+        data_cache[index].way[entry.lru].word[0] <= ccif.dload[CPUID];
+        data_cache[index].way[entry.lru].valid   <= 1;
+        data_cache[index].way[entry.lru].tag     <= requestTag;
       end
 
       if (state == RAMLOAD && nextstate == IDLE) begin
-        data_cache[dcif.dmemaddr[5:3]].way[entry.lru].word[1] <= ccif.dload[CPUID];
-        data_cache[dcif.dmemaddr[5:3]].lru <= !data_cache[dcif.dmemaddr[5:3]].lru;
+        data_cache[index].way[entry.lru].word[1] <= ccif.dload[CPUID];
+        data_cache[index].lru <= !data_cache[index].lru;
       end
 
-      if (nextstate == IDLE && dcif.dmemWEN) begin
-        data_cache[dcif.dmemaddr[5:3]].way[!wayhit[0]].dirty     <= 1;
-        data_cache[dcif.dmemaddr[5:3]].way[!wayhit[0]].word[dcif.dmemaddr[2]] <= dcif.dmemstore;
+      if (state != RAMWR && nextstate == IDLE && dcif.dmemWEN) begin
+        if (state == IDLE) begin
+          data_cache[index].way[wayhit[1]].dirty  <= 1;
+          data_cache[index].way[wayhit[1]].word[dcif.dmemaddr[2]] <=
+              dcif.dmemstore;
+        end else begin
+          data_cache[index].way[entry.lru].dirty  <= 1;
+          data_cache[index].way[entry.lru].word[dcif.dmemaddr[2]] <=
+              dcif.dmemstore;
+        end
       end
-      if (state == RAMWR && nextstate == RAMLOAD)
-        data_cache[dcif.dmemaddr[5:3]].way[entry.lru].dirty   <= 0;
+      if (state == RAMWR && nextstate == IDLE)
+        data_cache[index].way[entry.lru].dirty  <= 0;
 
       if (nextstate == IDLE && (dcif.dmemREN || dcif.dmemWEN) && hit)
-        data_cache[dcif.dmemaddr[5:3]].lru   <= wayhit[0];
+        data_cache[index].lru   <= wayhit[0];
     end
   end
 
   always_comb
   begin
-    nextstate = state;
-    ccif.dREN = 0;
-    ccif.dWEN = 0;
+    nextstate   = state;
+    dREN   = 0;
+    dWEN   = 0;
+    dstore = 0;
+    daddr  = 0;
     casez(state)
       IDLE: begin
         if (!hit && (dcif.dmemREN || dcif.dmemWEN)) begin
           if (!dirty) begin
-            ccif.dREN = 1;
-            ccif.daddr = {dcif.dmemaddr[31:3], 3'b000};
+            dREN = 1;
+            daddr = {dcif.dmemaddr[31:3], 3'b000};
             if (!ccif.dwait[CPUID])
               nextstate = RAMLOAD;
           end else begin
-            ccif.dWEN = 1;
-            ccif.daddr = {block.tag, dcif.dmemaddr[5:3], 3'b000};
-            ccif.dstore = block.word[0];
+            dWEN = 1;
+            daddr = {block.tag, index, 3'b000};
+            dstore = block.word[0];
             if (!ccif.dwait[CPUID])
               nextstate = RAMWR;
           end
         end
       end
       RAMLOAD: begin
-        ccif.dREN = 1;
-        ccif.daddr = {dcif.dmemaddr[31:3], 3'b100};
+        dREN = 1;
+        daddr = {dcif.dmemaddr[31:3], 3'b100};
         if (!ccif.dwait[CPUID])
           nextstate = IDLE;
       end
       RAMWR: begin
-        ccif.dWEN = 1;
-        ccif.daddr = {block.tag, dcif.dmemaddr[5:3], 3'b100};
-        ccif.dstore = block.word[1];
+        dWEN = 1;
+        daddr = {block.tag, index, 3'b100};
+        dstore = block.word[1];
         if (!ccif.dwait[CPUID])
-          nextstate = RAMLOAD;
+          nextstate = IDLE;
       end
     endcase
-
-  dcif.dhit = (hit && (dcif.dmemREN || dcif.dmemWEN) && state == IDLE) ||
-              (state == RAMLOAD && nextstate == IDLE);
-
-  if (state == RAMLOAD && nextstate == IDLE)
-    dcif.dmemload = ccif.dload[CPUID];
-  else
-    dcif.dmemload = ddata;
   end
+
+  always_ff @ (posedge CLK, negedge nRST) begin
+    if(!nRST) begin
+      flush_index <= 0;
+      flush_col   <= 0;
+    end else if (dcif.halt && !dcif.flushed) begin
+      if (!ccif.dwait[CPUID] || !flush_WEN) begin
+        if (flush_col == 3) begin
+          flush_index <= flush_index + 1;
+          flush_col   <= 0;
+        end else begin
+          flush_col   <= flush_col + 1;
+        end
+      end
+    end
+  end
+  assign flush_WEN   = data_cache[flush_index].way[flush_col[1]].dirty;
+  assign flush_addr  = {data_cache[flush_index].way[flush_col[1]].tag,
+                        flush_index, flush_col[0], 2'b0};
+  assign flush_store =
+            data_cache[flush_index].way[flush_col[1]].word[flush_col[0]];
+
+  assign ccif.dREN    = dREN;
+  assign ccif.dWEN    = dcif.halt ? flush_WEN : dWEN;
+  assign ccif.daddr    = dcif.halt ? flush_addr : daddr;
+  assign ccif.dstore  = dcif.halt ? flush_store : dstore;
+
+  assign dcif.flushed = flush_index == 7 && flush_col == 3;
 endmodule

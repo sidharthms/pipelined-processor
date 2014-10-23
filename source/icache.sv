@@ -67,17 +67,4 @@ module icache (
         state <= RAMREAD;
     end
   end
-
-`ifndef USE_DCACHE
-  // dcache invalidate before halt
-  assign dcif.flushed = dcif.halt;
-
-  assign ccif.dREN[CPUID] = dcif.dmemREN;
-  assign ccif.dWEN[CPUID] = dcif.dmemWEN;
-  assign ccif.dstore[CPUID] = dcif.dmemstore;
-  assign ccif.daddr[CPUID] = dcif.dmemaddr;
-
-  assign dcif.dhit = (dcif.dmemREN|dcif.dmemWEN) ? ~ccif.dwait[CPUID] : 0;
-  assign dcif.dmemload = ccif.dload[CPUID];
-`endif
 endmodule
