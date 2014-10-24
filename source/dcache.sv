@@ -90,11 +90,11 @@ module dcache (
       end
 
       if (state != RAMWR && nextstate == IDLE && dcif.dmemWEN) begin
-        if (state == IDLE) begin
+        if (state == IDLE && hit) begin
           data_cache[index].way[wayhit[1]].dirty  <= 1;
           data_cache[index].way[wayhit[1]].word[dcif.dmemaddr[2]] <=
               dcif.dmemstore;
-        end else begin
+        end else if (state == RAMLOAD) begin
           data_cache[index].way[entry.lru].dirty  <= 1;
           data_cache[index].way[entry.lru].word[dcif.dmemaddr[2]] <=
               dcif.dmemstore;
